@@ -1,0 +1,25 @@
+# Virtual Environment
+.venv/
+bin/
+include/
+lib/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ML / Weights (Don't push these! — only in models/)
+models/**/*.bin
+models/**/*.pt
+models/**/*.safetensors
+.cache/
+hf_home/
+
+# Project Specifics
+outputs/
+plots/
+*.log
+
+# Environment keys
+.env

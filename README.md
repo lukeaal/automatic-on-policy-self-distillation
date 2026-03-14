@@ -1,2 +1,10 @@
 # automatic-on-policy-self-distillation
 will come up with better name later
+
+(inside source)
+agent; prompt optimization harness (on the evals)
+data; setting up eval data
+eval; running baselines (vllm and llm eval)
+models; manages the models and fronteir models apis
+self-distillation; runs self-distillation, https://arxiv.org/abs/2601.18734
+viz; vibe coded matplot lib or other wise imaging

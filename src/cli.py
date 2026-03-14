@@ -1,26 +1,30 @@
-"""CLI entrypoint using Google Fire."""
+"""CLI entrypoint using Typer."""
 
-import fire
+import typer
+
+app = typer.Typer()
 
 
-class CLI:
-    """Main CLI with subcommands."""
+@app.command()
+def train():
+    """Run training."""
+    typer.echo("train")
 
-    def train(self, **kwargs):
-        """Run training."""
-        print("train", kwargs)
 
-    def eval(self, **kwargs):
-        """Run evaluation."""
-        print("eval", kwargs)
+@app.command()
+def eval():
+    """Run evaluation."""
+    typer.echo("eval")
 
-    def viz(self, **kwargs):
-        """Run visualization."""
-        print("viz", kwargs)
+
+@app.command()
+def viz():
+    """Run visualization."""
+    typer.echo("viz")
 
 
 def main():
-    fire.Fire(CLI)
+    app()
 
 
 if __name__ == "__main__":

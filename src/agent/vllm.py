@@ -1,9 +1,10 @@
-"""lm-eval wrapper utilities for hypothesis-applied prompt evaluation."""
+"""Simple lm-eval wrapper utilities for local-completions evaluation."""
 
 from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,44 +20,12 @@ class LMEvalResult:
     raw_results: dict
 
 
-class HypothesisLMEvalRunner:
-    """
-    Run any lm-eval task with a hypothesis function applied to doc prompts.
-
-    This uses lm-evaluation-harness external task loading by generating a temporary
-    plugin task that subclasses the target task and overrides `doc_to_text`.
-    """
+class LMEvalRunner:
+    """Run lm-eval tasks against an OpenAI-compatible local-completions endpoint."""
 
     def __init__(self, base_url: str = "http://localhost:8000/v1", api_key: str = "EMPTY") -> None:
         self.base_url = base_url
         self.api_key = api_key
-
-    @staticmethod
-    def _plugin_source(task_name: str, hypothesis_source: str) -> str:
-        wrapped_task_name = f"{task_name}_hyp"
-        return f"""
-from lm_eval.tasks import get_task_dict
-from src.agent.optimizer import load_hypothesis_function
-
-TARGET_TASK = {task_name!r}
-WRAPPED_TASK = {wrapped_task_name!r}
-_HYPOTHESIS_SOURCE = {hypothesis_source!r}
-_HYP_FN = load_hypothesis_function(_HYPOTHESIS_SOURCE)
-
-_base_task_dict = get_task_dict([TARGET_TASK])
-_base_task = _base_task_dict[TARGET_TASK]
-_base_task_cls = _base_task.__class__
-
-class WrappedHypothesisTask(_base_task_cls):
-    def doc_to_text(self, doc):
-        base_prompt = super().doc_to_text(doc)
-        transformed = _HYP_FN(base_prompt)
-        if not isinstance(transformed, str):
-            raise TypeError("Hypothesis function must return a string.")
-        return transformed
-
-TASK_REGISTRY = {{WRAPPED_TASK: WrappedHypothesisTask}}
-"""
 
     @staticmethod
     def _select_score(results_json: dict, task_name: str) -> tuple[float, str]:
@@ -88,35 +57,26 @@ TASK_REGISTRY = {{WRAPPED_TASK: WrappedHypothesisTask}}
     def evaluate_task(
         self,
         *,
-        hypothesis_source: str,
         task_name: str,
         model_id: str,
+        include_path: Path | None = None,
         batch_size: str = "auto",
         num_fewshot: int = 0,
         limit: int | None = None,
     ) -> LMEvalResult:
-        wrapped_task_name = f"{task_name}_hyp"
         with tempfile.TemporaryDirectory(prefix="lm_eval_hyp_") as temp_dir:
             temp_path = Path(temp_dir)
-            plugin_dir = temp_path / "plugin"
-            plugin_dir.mkdir(parents=True, exist_ok=True)
-            plugin_file = plugin_dir / "wrapped_hypothesis_task.py"
-            plugin_file.write_text(
-                self._plugin_source(task_name=task_name, hypothesis_source=hypothesis_source),
-                encoding="utf-8",
-            )
-
             output_path = temp_path / "results.json"
             model_args = (
                 f"model={model_id},base_url={self.base_url},api_key={self.api_key}"
             )
 
             command = [
+                sys.executable,
+                "-m",
                 "lm_eval",
-                "--include_path",
-                str(plugin_dir),
                 "--tasks",
-                wrapped_task_name,
+                task_name,
                 "--model",
                 "local-completions",
                 "--model_args",
@@ -128,6 +88,8 @@ TASK_REGISTRY = {{WRAPPED_TASK: WrappedHypothesisTask}}
                 "--output_path",
                 str(output_path),
             ]
+            if include_path is not None:
+                command.extend(["--include_path", str(include_path)])
             if limit is not None:
                 command.extend(["--limit", str(limit)])
 
@@ -146,10 +108,10 @@ TASK_REGISTRY = {{WRAPPED_TASK: WrappedHypothesisTask}}
                 )
 
             results_json = json.loads(output_path.read_text(encoding="utf-8"))
-            score, metric_name = self._select_score(results_json, wrapped_task_name)
+            score, metric_name = self._select_score(results_json, task_name)
             return LMEvalResult(
                 score=score,
                 metric_name=metric_name,
-                task_name=wrapped_task_name,
+                task_name=task_name,
                 raw_results=results_json,
             )

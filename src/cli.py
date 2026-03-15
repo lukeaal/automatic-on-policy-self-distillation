@@ -42,7 +42,7 @@ def opt_hyp(
     eval_name: str = typer.Option(
         "gsm8k",
         "--eval",
-        help="lm-eval task name (for example: gsm8k, hellaswag).",
+        help="Eval name to optimize (currently supported: gsm8k).",
     ),
     base_url: str = typer.Option(
         "http://localhost:8000/v1",

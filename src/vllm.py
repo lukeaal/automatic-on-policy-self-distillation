@@ -45,7 +45,8 @@ class VLLMModel:
             from vllm import LLM
         except ImportError as exc:
             raise ImportError(
-                "vLLM is not installed. Install it with `uv add vllm` to use local serving."
+                "vLLM is not installed. On Linux, install it with `uv sync --group linux` "
+                "to use local serving."
             ) from exc
 
         available_gpus = self._available_gpu_count()
@@ -86,7 +87,8 @@ class VLLMModel:
             from vllm import SamplingParams
         except ImportError as exc:
             raise ImportError(
-                "vLLM is not installed. Install it with `uv add vllm` to use local serving."
+                "vLLM is not installed. On Linux, install it with `uv sync --group linux` "
+                "to use local serving."
             ) from exc
 
         sampling_params = SamplingParams(

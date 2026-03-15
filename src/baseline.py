@@ -18,7 +18,6 @@ class BaselineResult:
 
     eval_names: tuple[str, ...]
     task_results: dict[str, dict[str, Any]]
-    prompt_response_pairs: dict[str, tuple[tuple[str, str], ...]]
 
 
 def _parse_eval_names(eval_name: str) -> list[str]:
@@ -38,74 +37,6 @@ def _format_metric_value(value: Any) -> str:
     if isinstance(value, int):
         return str(value)
     return json.dumps(value, ensure_ascii=True, default=str)
-
-
-def _stringify_sample_value(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-
-    if isinstance(value, tuple):
-        return "\n".join(
-            part for item in value if (part := _stringify_sample_value(item).strip())
-        )
-
-    if isinstance(value, list):
-        return "\n".join(
-            part for item in value if (part := _stringify_sample_value(item).strip())
-        )
-
-    if value is None:
-        return ""
-
-    return json.dumps(value, indent=2, ensure_ascii=True, default=str)
-
-
-def _extract_primary_text(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-
-    if isinstance(value, dict):
-        for key in ("prompt", "text", "response", "completion", "content"):
-            candidate = value.get(key)
-            if isinstance(candidate, str) and candidate.strip():
-                return candidate
-        for nested_value in value.values():
-            text = _extract_primary_text(nested_value).strip()
-            if text:
-                return text
-        return ""
-
-    if isinstance(value, list | tuple):
-        for item in value:
-            text = _extract_primary_text(item).strip()
-            if text:
-                return text
-        return ""
-
-    return ""
-
-
-def _extract_prompt_response_pairs(
-    samples: dict[str, list[dict[str, Any]]],
-) -> dict[str, tuple[tuple[str, str], ...]]:
-    prompt_response_pairs: dict[str, tuple[tuple[str, str], ...]] = {}
-    for task_name, task_samples in samples.items():
-        pairs: list[tuple[str, str]] = []
-        for sample in task_samples:
-            prompt = _extract_primary_text(sample.get("arguments", [])) or _stringify_sample_value(
-                sample.get("arguments", [])
-            ).strip()
-            response_source = sample.get("filtered_resps") or sample.get("resps") or []
-            response = _extract_primary_text(response_source) or _stringify_sample_value(
-                response_source
-            ).strip()
-            if prompt or response:
-                pairs.append((prompt, response))
-
-        if pairs:
-            prompt_response_pairs[task_name] = tuple(pairs)
-
-    return prompt_response_pairs
 
 
 def run_baseline(
@@ -133,7 +64,6 @@ def run_baseline(
     return BaselineResult(
         eval_names=tuple(task_names),
         task_results=results["results"],
-        prompt_response_pairs=_extract_prompt_response_pairs(results.get("samples", {})),
     )
 
 
@@ -177,13 +107,5 @@ def format_baseline_result(result: BaselineResult) -> str:
 
         for metric_name, metric_value in sorted(metrics.items()):
             output.append(f"{metric_name}={_format_metric_value(metric_value)}")
-
-    if result.prompt_response_pairs:
-        output.append("Baseline prompt-response pairs:")
-        for task_name, pairs in sorted(result.prompt_response_pairs.items()):
-            output.append(f"Task: {task_name}")
-            for index, (prompt, response) in enumerate(pairs, start=1):
-                output.append(f"[{index}] Prompt:\n{prompt or '[empty]'}")
-                output.append(f"[{index}] Response:\n{response or '[empty]'}")
 
     return "\n\n".join(output)

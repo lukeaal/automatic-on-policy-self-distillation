@@ -6,5 +6,5 @@ agent; prompt optimization harness (on the evals)
 data; setting up eval data
 eval; running baselines (vllm and llm eval)
 models; manages the models and fronteir models apis
-self-distillation; runs self-distillation, https://arxiv.org/abs/2601.18734
+self-distillation; runs self-distillation, https://arxiv.org/abs/2603.05433
 viz; vibe coded matplot lib or other wise imaging

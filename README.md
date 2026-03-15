@@ -22,7 +22,7 @@ Run from the repository root with `uv`:
 ```bash
 uv run asd --help
 uv run asd help
-uv run asd run --model <model> --evals <evals-filepath> --trials <trials>
+uv run asd run --model <model> --eval <task-name> --gpus <gpu-count>
 ```
 
 `--model` must be a Hugging Face model identifier (for example, `distilbert-base-uncased` or `meta-llama/Llama-3.2-1B`).

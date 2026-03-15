@@ -12,6 +12,8 @@ dependencies = [
     "dotenv>=0.9.9",
     "huggingface-hub>=0.34.0,<1.0",
     "litellm>=1.82.2",
+    "lm-eval>=0.4.11",
+    "ray>=2.54.0",
     "tinker>=0.15.0",
     "tokenizers<0.23",
     "transformers==4.57.6",

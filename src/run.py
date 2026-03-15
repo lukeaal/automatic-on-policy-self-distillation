@@ -1,6 +1,5 @@
 """Run command handler."""
 
-from pathlib import Path
 from collections.abc import Iterator
 from contextlib import contextmanager
 import threading
@@ -8,9 +7,8 @@ import time
 
 import typer
 
-from .agent.foundation_model import FoundationModel
 from .agent.student_model import StudentModel
-from .vllm import VLLMModel
+from .baseline import format_baseline_result, run_baseline, write_baseline_json
 
 
 @contextmanager
@@ -37,37 +35,29 @@ def spinner(step: str) -> Iterator[None]:
         spinner_thread.join()
 
 
-def run_command(model: str, evals: Path, trials: int) -> None:
+def run_command(model: str, eval_name: str, gpus: int | None = None) -> None:
     """Handle the CLI run command."""
 
     # Validate input parameters
-    if not evals.exists():
-        raise typer.BadParameter(f"Evals file not found: {evals}")
-    if trials < 1:
-        raise typer.BadParameter("trials must be >= 1")
-
-    with spinner("Setting up foundation model"):
-        foundation_model = FoundationModel()
+    if not eval_name.strip():
+        raise typer.BadParameter("eval must not be empty")
+    if gpus is not None and gpus < 1:
+        raise typer.BadParameter("gpus must be >= 1")
 
     with spinner("Downloading student model"):
         student_model = StudentModel(student_model_id=model)
         local_model_path = student_model.setup()
 
-    # TODO: We want to run evals in parallel so lets deploy multiple instances
-    with spinner("Starting local vLLM model server"):
-        vllm_model = VLLMModel()
-        vllm_model.load_model_for_serving(model=str(local_model_path))
+    with spinner(f'Running baseline eval "{eval_name}"'):
+        baseline_result = run_baseline(
+            model_path=local_model_path,
+            eval_name=eval_name,
+            gpus=gpus,
+        )
 
-    with spinner('Generating vLLM health-check prompt "hello"'):
-        healthcheck_responses = vllm_model.generate(prompts=["hello"], max_tokens=32)
-
-    hello_response = healthcheck_responses[0].strip() if healthcheck_responses else ""
-    typer.echo(
-        'vLLM health-check prompt="hello" '
-        f'response="{hello_response if hello_response else "[empty response]"}"'
-    )
-
-    # Run baselines
+    baseline_json_path = write_baseline_json(baseline_result, eval_name)
+    typer.echo(format_baseline_result(baseline_result))
+    typer.echo(f"Wrote baseline metrics to {baseline_json_path}")
 
     # kickoff agent loop
 
@@ -79,6 +69,7 @@ def run_command(model: str, evals: Path, trials: int) -> None:
 
     typer.echo(
         "Running model="
-        f"{model} local_path={local_model_path} evals={evals} trials={trials} "
-        f"with foundation_model={foundation_model.model_id} and local vLLM GPU serving"
+        f"{model} local_path={local_model_path} eval={eval_name} "
+        f"gpus={gpus if gpus is not None else 'auto'} "
+        "with lm-eval"
     )

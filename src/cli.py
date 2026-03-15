@@ -1,7 +1,5 @@
 """CLI entrypoint using Typer."""
 
-from pathlib import Path
-
 import typer
 
 from .agent.foundation_model import FoundationModel
@@ -20,11 +18,19 @@ def help(ctx: typer.Context) -> None:
 @app.command()
 def run(
     model: str = typer.Option(..., "--model", help="Model identifier to run."),
-    evals: Path = typer.Option(..., "--evals", help="Path to evals file."),
-    trials: int = typer.Option(..., "--trials", help="Number of trials to run."),
+    eval_name: str = typer.Option(
+        ...,
+        "--eval",
+        help="lm-eval task name to run, or a comma-separated list of task names.",
+    ),
+    gpus: int | None = typer.Option(
+        None,
+        "--gpus",
+        help="Number of GPUs for vLLM tensor parallelism. Defaults to auto-detect.",
+    ),
 ) -> None:
     """Run evaluations for a model."""
-    run_command(model=model, evals=evals, trials=trials)
+    run_command(model=model, eval_name=eval_name, gpus=gpus)
 
 
 @app.command("opt_hyp")

@@ -5,6 +5,7 @@ import typer
 from .agent.foundation_model import FoundationModel
 from .agent.optimizer import run_hypothesis_loop
 from .run import run_command
+from pathlib import Path
 
 app = typer.Typer()
 

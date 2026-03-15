@@ -1,12 +1,24 @@
 """CLI entrypoint using Typer."""
 
+from datetime import datetime
+from pathlib import Path
+
 import typer
 
 from .agent.foundation_model import FoundationModel
 from .agent.optimizer import run_hypothesis_loop
 from .run import run_command
+from .self_distill import self_distill
 
 app = typer.Typer()
+
+
+def _distilled_model_dir(model: str, output_dir: Path | None) -> Path:
+    """Build an output path like `<model-name>-asd-<timestamp>`."""
+    model_name = model.rstrip("/").split("/")[-1]
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    parent = output_dir if output_dir is not None else Path.cwd()
+    return parent / f"{model_name}-asd-{timestamp}"
 
 
 @app.command()
@@ -31,6 +43,46 @@ def run(
 ) -> None:
     """Run evaluations for a model."""
     run_command(model=model, eval_name=eval_name, gpus=gpus)
+
+
+@app.command("self-distill")
+def self_distill_command(
+    model: str = typer.Option(..., "--model", help="Model identifier or local path."),
+    dataset: Path = typer.Option(..., "--dataset", help="Path to json/jsonl/parquet training data."),
+    batch_size: int = typer.Option(4, "--batch-size", min=1, help="Training batch size."),
+    epochs: int = typer.Option(1, "--epochs", min=1, help="Number of training epochs."),
+    lr: float = typer.Option(1e-5, "--lr", help="Learning rate."),
+    max_new_tokens: int = typer.Option(128, "--max-new-tokens", min=1, help="Max sampled rollout length."),
+    max_length: int = typer.Option(512, "--max-length", min=2, help="Max prompt+response sequence length."),
+    teacher_update_steps: int = typer.Option(
+        0,
+        "--teacher-update-steps",
+        min=0,
+        help="If > 0, copy student weights into teacher every N steps.",
+    ),
+    output_dir: Path | None = typer.Option(
+        None,
+        "--output-dir",
+        help="Optional parent directory for the distilled model output.",
+    ),
+) -> None:
+    """Run the minimal reverse-KL self-distillation loop."""
+    trained_model, tokenizer = self_distill(
+        model_name_or_path=model,
+        dataset_source=dataset,
+        batch_size=batch_size,
+        epochs=epochs,
+        lr=lr,
+        max_new_tokens=max_new_tokens,
+        max_length=max_length,
+        teacher_update_steps=teacher_update_steps,
+    )
+
+    save_dir = _distilled_model_dir(model=model, output_dir=output_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    trained_model.save_pretrained(save_dir)
+    tokenizer.save_pretrained(save_dir)
+    typer.echo(f"Saved distilled model to {save_dir}")
 
 
 @app.command("opt_hyp")

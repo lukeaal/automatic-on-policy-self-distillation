@@ -21,6 +21,10 @@ outputs/
 plots/
 *.log
 
+# Generated eval data & task YAMLs
+src/agent/data/
+src/agent/tasks/
+
 # Environment keys
 .env
 

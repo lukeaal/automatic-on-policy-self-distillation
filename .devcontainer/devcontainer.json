@@ -1,0 +1,30 @@
+{
+  "name": "automatic-on-policy-self-distillation-ubuntu22",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "runArgs": [
+    "--platform=linux/amd64"
+  ],
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly",
+    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
+  ],
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "UV_PYTHON_PREFERENCE": "managed",
+    "SSH_AUTH_SOCK": "/ssh-agent"
+  },
+  "postCreateCommand": "bash -lc 'uv python install 3.12 && uv sync'",
+  "postStartCommand": "bash -lc 'if [ ! -S /ssh-agent ]; then echo \"[devcontainer warning] SSH agent socket /ssh-agent is missing. Ensure SSH_AUTH_SOCK is set on the host before starting the container.\" >&2; fi'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff"
+      ]
+    }
+  }
+}

@@ -103,24 +103,58 @@ def load_hypothesis_function(
     return loaded
 
 
+def run_hypothesis_loop(
+    foundation_model: FoundationModel,
+    trials: int,
+    eval_name: str = "gsm8k",
+) -> tuple[str, float, dict[str, float]]:
+    """
+    Generate hypotheses in a loop and track a placeholder score.
+
+    This is a scaffold loop for optimizer development before eval integration.
+    """
+    if trials < 1:
+        raise ValueError("trials must be >= 1")
+
+    past_hypothesis_and_results: dict[str, float] = {}
+    best_hypothesis = ""
+    best_score = float("-inf")
+
+    for trial_idx in range(1, trials + 1):
+        hypothesis_source = generate_hypothesis(
+            foundation_model=foundation_model,
+            past_hypothesis_and_results=past_hypothesis_and_results,
+            eval_name=eval_name,
+        )
+
+        # Placeholder score until eval pipeline exists.
+        score = float(trial_idx)
+        past_hypothesis_and_results[hypothesis_source] = score
+
+        if score > best_score:
+            best_score = score
+            best_hypothesis = hypothesis_source
+
+    return best_hypothesis, best_score, past_hypothesis_and_results
+
+
 if __name__ == "__main__":
     sample_eval_name = "gsm8k"
-    past_hypothesis_and_results: dict[str, float] = {
-        "def translate(text):\n    return text.strip()": 0.42
-    }
     sample_input = "Translate this sentence."
+    sample_trials = 3
 
-    print("Running optimizer smoke test with FoundationModel...")
+    print("Running optimizer hypothesis-loop smoke test...")
     model = FoundationModel()
-    hypothesis_source = generate_hypothesis(
+    best_hypothesis, best_score, history = run_hypothesis_loop(
         foundation_model=model,
-        past_hypothesis_and_results=past_hypothesis_and_results,
+        trials=sample_trials,
         eval_name=sample_eval_name,
     )
-    print("\nGenerated hypothesis:\n")
-    print(hypothesis_source)
+    print(f"\nGenerated {len(history)} hypotheses. Best score={best_score}\n")
+    print("Best hypothesis:\n")
+    print(best_hypothesis)
 
-    hypothesis_fn = load_hypothesis_function(hypothesis_source)
+    hypothesis_fn = load_hypothesis_function(best_hypothesis)
     output = hypothesis_fn(sample_input)
     print("\nFunction output:\n")
     print(output)

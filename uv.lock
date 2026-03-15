@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 
 [[package]]
@@ -36,9 +36,10 @@ wheels = [
 [[package]]
 name = "automatic-on-policy-self-distillation"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "dotenv" },
+    { name = "huggingface-hub" },
     { name = "tinker" },
     { name = "typer" },
 ]
@@ -46,6 +47,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "dotenv", specifier = ">=0.9.9" },
+    { name = "huggingface-hub", specifier = ">=1.7.1" },
     { name = "tinker", specifier = ">=0.15.0" },
     { name = "typer", specifier = ">=0.24.1" },
 ]

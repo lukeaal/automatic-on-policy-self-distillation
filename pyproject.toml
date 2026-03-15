@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "automatic-on-policy-self-distillation"
 version = "0.1.0"
@@ -6,6 +10,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "dotenv>=0.9.9",
+    "huggingface-hub>=1.7.1",
     "tinker>=0.15.0",
     "typer>=0.24.1",
 ]
+
+[project.scripts]
+asd = "src.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

@@ -1,29 +1,31 @@
 """CLI entrypoint using Typer."""
 
+from pathlib import Path
+
 import typer
+
+from .run import run_command
 
 app = typer.Typer()
 
-# TODO, have nothing done now, all of this is ai slop
-@app.command()
-def train():
-    """Run training."""
-    typer.echo("train")
-
 
 @app.command()
-def eval():
-    """Run evaluation."""
-    typer.echo("eval")
+def help(ctx: typer.Context) -> None:
+    """Show CLI help."""
+    typer.echo(ctx.parent.get_help() if ctx.parent else ctx.get_help())
 
 
 @app.command()
-def viz():
-    """Run visualization."""
-    typer.echo("viz")
+def run(
+    model: str = typer.Option(..., "--model", help="Model identifier to run."),
+    evals: Path = typer.Option(..., "--evals", help="Path to evals file."),
+    trials: int = typer.Option(..., "--trials", help="Number of trials to run."),
+) -> None:
+    """Run evaluations for a model."""
+    run_command(model=model, evals=evals, trials=trials)
 
 
-def main():
+def main() -> None:
     app()
 
 

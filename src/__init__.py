@@ -1,12 +1,10 @@
 """Source package for automatic-on-policy-self-distillation."""
 
-from src import agent
-from src import cli
-from src import config
-from src import data
-from src import eval
-from src import models
-from src import train
-from src import viz
+__all__ = ["agent", "cli", "config", "data", "eval", "models", "train", "providers"]
 
-__all__ = ["agent", "cli", "config", "data", "eval", "models", "train", "viz"]
+def __getattr__(name):
+    if name in __all__:
+        import importlib
+        # relative import '.' ensures it stays within the package
+        return importlib.import_module(f".{name}", __name__)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

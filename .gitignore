@@ -23,3 +23,6 @@ plots/
 
 # Environment keys
 .env
+
+# Testing
+scratch.py

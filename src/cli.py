@@ -4,7 +4,7 @@ import typer
 
 app = typer.Typer()
 
-
+# TODO, have nothing done now, all of this is ai slop
 @app.command()
 def train():
     """Run training."""

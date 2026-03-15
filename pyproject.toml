@@ -10,9 +10,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "dotenv>=0.9.9",
-    "huggingface-hub>=1.7.1",
+    "huggingface-hub>=0.34.0,<1.0",
     "litellm>=1.82.2",
     "tinker>=0.15.0",
+    "tokenizers<0.23",
+    "transformers==4.57.6",
     "typer>=0.24.1",
 ]
 

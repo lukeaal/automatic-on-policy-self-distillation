@@ -23,4 +23,4 @@ uv run asd --help
 uv run asd run --model <model> --eval <path-to-eval> --gpus <gpu-count>
 ```
 
-`--model` must be a Hugging Face model identifier (for example, `distilbert-base-uncased` or `meta-llama/Llama-3.2-1B`).
+`--model` must be a Hugging Face model identifier (for example, `Qwen/Qwen3-4B-Thinking-2507`).

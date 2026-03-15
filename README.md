@@ -1,19 +1,18 @@
-# automatic-on-policy-self-distillation
-will come up with better name later
+# Automatic Self-Distillation (ASD)
 
-(inside source)
+Luke Atkins & Gerardo Salazar
 
-agent; prompt optimization harness (on the evals)
+Based on ideas from:  https://arxiv.org/abs/2603.05433
 
-data; setting up eval data
+## Core Idea
 
-eval; running baselines (vllm and llm eval)
+The ASD system improves the performance of a given model on a given eval dataset by
+learning prompt techniques that improve the performance of the model, then self-distilling the best prompt technique
+into the model so the final model performs better without even needing the specific prompting.
 
-models; manages the models and fronteir models apis
+![Automatic Self-Distillation core idea](assets/asd.png)
 
-self-distillation; runs self-distillation, https://arxiv.org/abs/2603.05433
 
-viz; vibe coded matplot lib or other wise imaging
 
 ## Usage
 
@@ -21,8 +20,7 @@ Run from the repository root with `uv`:
 
 ```bash
 uv run asd --help
-uv run asd help
-uv run asd run --model <model> --eval <task-name> --gpus <gpu-count>
+uv run asd run --model <model> --eval <path-to-eval> --gpus <gpu-count>
 ```
 
 `--model` must be a Hugging Face model identifier (for example, `distilbert-base-uncased` or `meta-llama/Llama-3.2-1B`).

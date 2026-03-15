@@ -9,6 +9,7 @@ from .agent.foundation_model import FoundationModel
 from .agent.optimizer import run_hypothesis_loop
 from .run import run_command
 from .self_distill import self_distill
+from pathlib import Path
 
 app = typer.Typer()
 

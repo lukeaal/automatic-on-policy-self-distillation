@@ -1,117 +1,100 @@
-"""Simple lm-eval wrapper utilities for local-completions evaluation."""
+"""vLLM wrapper utilities for local GPU serving."""
 
 from __future__ import annotations
 
-import json
-import subprocess
-import sys
-import tempfile
-from dataclasses import dataclass
-from pathlib import Path
+import os
+import warnings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vllm import LLM
 
 
-@dataclass
-class LMEvalResult:
-    """Structured lm-eval result for one task run."""
+class VLLMModel:
+    """Manage a vLLM model instance for local GPU inference."""
 
-    score: float
-    metric_name: str
-    task_name: str
-    raw_results: dict
-
-
-class LMEvalRunner:
-    """Run lm-eval tasks against an OpenAI-compatible local-completions endpoint."""
-
-    def __init__(self, base_url: str = "http://localhost:8000/v1", api_key: str = "EMPTY") -> None:
-        self.base_url = base_url
-        self.api_key = api_key
+    def __init__(self) -> None:
+        self._llm: LLM | None = None
 
     @staticmethod
-    def _select_score(results_json: dict, task_name: str) -> tuple[float, str]:
-        task_results = results_json.get("results", {}).get(task_name, {})
-        if not task_results:
-            raise ValueError(f"No results found for task '{task_name}'. Got keys: {list(results_json.get('results', {}).keys())}")
+    def _available_gpu_count() -> int:
+        """Best-effort GPU count for vLLM tensor parallel sizing."""
+        cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
+        if cuda_visible_devices is not None:
+            visible = [device.strip() for device in cuda_visible_devices.split(",")]
+            visible = [device for device in visible if device and device != "-1"]
+            if visible:
+                return len(visible)
 
-        preferred_metrics = (
-            "exact_match,strict-match",
-            "exact_match,none",
-            "exact_match",
-            "acc,none",
-            "acc_norm,none",
-            "f1,none",
-            "bleu,none",
-            "rouge1,none",
-        )
-        for metric_name in preferred_metrics:
-            metric_value = task_results.get(metric_name)
-            if isinstance(metric_value, (int, float)):
-                return float(metric_value), metric_name
+        try:
+            import torch
 
-        for metric_name, metric_value in task_results.items():
-            if isinstance(metric_value, (int, float)) and "_stderr" not in metric_name:
-                return float(metric_value), metric_name
+            return max(1, int(torch.cuda.device_count()))
+        except Exception:
+            return 1
 
-        raise ValueError(f"Unable to select numeric metric from task results: {task_results}")
-
-    def evaluate_task(
+    def load_model_for_serving(
         self,
-        *,
-        task_name: str,
-        model_id: str,
-        include_path: Path | None = None,
-        batch_size: str = "auto",
-        num_fewshot: int = 0,
-        limit: int | None = None,
-    ) -> LMEvalResult:
-        with tempfile.TemporaryDirectory(prefix="lm_eval_hyp_") as temp_dir:
-            temp_path = Path(temp_dir)
-            output_path = temp_path / "results.json"
-            model_args = (
-                f"model={model_id},base_url={self.base_url},api_key={self.api_key}"
+        model: str,
+        tensor_parallel_size: int | None = None,
+        gpu_memory_utilization: float = 0.9,
+        max_model_len: int = 4096,
+    ) -> LLM:
+        """Load a specified model across GPUs for serving."""
+        try:
+            from vllm import LLM
+        except ImportError as exc:
+            raise ImportError(
+                "vLLM is not installed. On Linux, install it with `uv sync --group linux` "
+                "to use local serving."
+            ) from exc
+
+        available_gpus = self._available_gpu_count()
+        requested_parallelism = (
+            available_gpus if tensor_parallel_size is None else max(1, tensor_parallel_size)
+        )
+        effective_parallelism = min(requested_parallelism, available_gpus)
+        if effective_parallelism < requested_parallelism:
+            warnings.warn(
+                "Requested tensor_parallel_size="
+                f"{requested_parallelism}, but only {available_gpus} GPU(s) are available. "
+                f"Using tensor_parallel_size={effective_parallelism}.",
+                stacklevel=2,
             )
 
-            command = [
-                sys.executable,
-                "-m",
-                "lm_eval",
-                "--tasks",
-                task_name,
-                "--model",
-                "local-completions",
-                "--model_args",
-                model_args,
-                "--batch_size",
-                batch_size,
-                "--num_fewshot",
-                str(num_fewshot),
-                "--output_path",
-                str(output_path),
-            ]
-            if include_path is not None:
-                command.extend(["--include_path", str(include_path)])
-            if limit is not None:
-                command.extend(["--limit", str(limit)])
+        self._llm = LLM(
+            model=model,
+            tensor_parallel_size=effective_parallelism,
+            gpu_memory_utilization=gpu_memory_utilization,
+            max_model_len=max_model_len,
+        )
+        return self._llm
 
-            process = subprocess.run(command, check=False, capture_output=True, text=True)
-            if process.returncode != 0:
-                raise RuntimeError(
-                    "lm_eval command failed.\n"
-                    f"Command: {' '.join(command)}\n\n"
-                    f"stdout:\n{process.stdout}\n\n"
-                    f"stderr:\n{process.stderr}"
-                )
-
-            if not output_path.exists():
-                raise FileNotFoundError(
-                    f"lm_eval succeeded but did not produce output at {output_path}"
-                )
-
-            results_json = json.loads(output_path.read_text(encoding="utf-8"))
-            score, metric_name = self._select_score(results_json, task_name)
-            return LMEvalResult(
-                score=score,
-                metric_name=metric_name,
-                task_name=task_name,
-                raw_results=results_json,
+    def generate(
+        self,
+        prompts: list[str],
+        temperature: float = 0.7,
+        top_p: float = 0.95,
+        max_tokens: int = 100,
+    ) -> list[str]:
+        """Generate text for prompts using the loaded vLLM model."""
+        if self._llm is None:
+            raise RuntimeError(
+                "Model is not loaded. Call load_model_for_serving() before generate()."
             )
+
+        try:
+            from vllm import SamplingParams
+        except ImportError as exc:
+            raise ImportError(
+                "vLLM is not installed. On Linux, install it with `uv sync --group linux` "
+                "to use local serving."
+            ) from exc
+
+        sampling_params = SamplingParams(
+            temperature=temperature,
+            top_p=top_p,
+            max_tokens=max_tokens,
+        )
+        outputs = self._llm.generate(prompts, sampling_params)
+        return [output.outputs[0].text for output in outputs]

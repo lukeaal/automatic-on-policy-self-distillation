@@ -8,8 +8,10 @@ from typing import Any
 
 try:
     from .foundation_model import FoundationModel
+    from .vllm import HypothesisLMEvalRunner
 except ImportError:  # allows direct script execution: uv run src/agent/optimizer.py
-    from foundation_model import FoundationModel
+    from src.agent.foundation_model import FoundationModel
+    from src.agent.vllm import HypothesisLMEvalRunner
 
 
 BASE_PROMPT = """
@@ -27,6 +29,9 @@ Do not use any docstrings.
 Do not use any type hints.
 Do not use any class definitions.
 Do not use any import statements.
+Do not add or remove sections from the original prompt template used by the eval task.
+Do not remove formatting constraints that the eval task depends on.
+Only make minimal text edits needed to improve performance while preserving structure.
 
 Return only the python function text with correct indentation and syntax.
 """.strip()
@@ -106,7 +111,13 @@ def load_hypothesis_function(
 def run_hypothesis_loop(
     foundation_model: FoundationModel,
     trials: int,
-    eval_name: str = "gsm8k",
+    eval_name: str,
+    model_id: str,
+    base_url: str = "http://localhost:8000/v1",
+    api_key: str = "EMPTY",
+    batch_size: str = "auto",
+    num_fewshot: int = 0,
+    limit: int | None = None,
 ) -> tuple[str, float, dict[str, float]]:
     """
     Generate hypotheses in a loop and track a placeholder score.
@@ -120,6 +131,8 @@ def run_hypothesis_loop(
     best_hypothesis = ""
     best_score = float("-inf")
 
+    evaluator = HypothesisLMEvalRunner(base_url=base_url, api_key=api_key)
+
     for trial_idx in range(1, trials + 1):
         hypothesis_source = generate_hypothesis(
             foundation_model=foundation_model,
@@ -127,9 +140,19 @@ def run_hypothesis_loop(
             eval_name=eval_name,
         )
 
-        # Placeholder score until eval pipeline exists.
-        score = float(trial_idx)
+        result = evaluator.evaluate_task(
+            hypothesis_source=hypothesis_source,
+            task_name=eval_name,
+            model_id=model_id,
+            batch_size=batch_size,
+            num_fewshot=num_fewshot,
+            limit=limit,
+        )
+        score = result.score
         past_hypothesis_and_results[hypothesis_source] = score
+        print(
+            f"[trial {trial_idx}/{trials}] task={result.task_name} metric={result.metric_name} score={score}"
+        )
 
         if score > best_score:
             best_score = score
@@ -140,6 +163,7 @@ def run_hypothesis_loop(
 
 if __name__ == "__main__":
     sample_eval_name = "gsm8k"
+    sample_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     sample_input = "Translate this sentence."
     sample_trials = 3
 
@@ -149,6 +173,7 @@ if __name__ == "__main__":
         foundation_model=model,
         trials=sample_trials,
         eval_name=sample_eval_name,
+        model_id=sample_model_id,
     )
     print(f"\nGenerated {len(history)} hypotheses. Best score={best_score}\n")
     print("Best hypothesis:\n")
